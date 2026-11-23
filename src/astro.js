@@ -93,14 +93,16 @@ export function termTime(year, k) { // k: 0=춘분 … 18=동지
 }
 // ms 이전 가장 가까운 동지의 「동짓날 자정」(지방 평균태양시 0시)
 export function lastDongji(ms, lon) {
-  const y = parts(ms).y; let t = termTime(y, 18); if (t > ms) t = termTime(y - 1, 18);
   // 동지가 든 날(지방평균시)의 자정 → 그 날 0시
-  const lmtOff = lon / 15 * 36e5; const local = t + lmtOff; const mid = Math.floor(local / 864e5) * 864e5 - lmtOff;
-  return { term: t, midnight: mid };
+  const lmtOff = lon / 15 * 36e5;
+  const of = yy => { const t = termTime(yy, 18); return { term: t, midnight: Math.floor((t + lmtOff) / 864e5) * 864e5 - lmtOff } };
+  // 동짓날 0시부터 동지 순간 사이도 그해 동짓날로 친다(동지 순간이 아니라 그날 자정과 견준다)
+  const y = parts(ms).y; let r = of(y); if (r.midnight > ms) r = of(y - 1);
+  return r;
 }
 
 // ── 세종 때 12시 100각 ──
-// 하루 100각, 1시(2시간) = 8⅓각, 초·정 각 4⅙각 = 초각(⅙각) + 1~4각, 1각 = 6분(分)
+// 하루 100각, 1시(2시간) = 8⅓각, 초·정 각 4⅙각 = 초각·1각·2각·3각(각 6분) + 4각(1분), 1각 = 6분(分)
 export const SHI_H = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 export const SHI_K = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
 const NUM_H = ['初', '一', '二', '三', '四', '五'];
