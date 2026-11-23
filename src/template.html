@@ -1,0 +1,247 @@
+<title>일성정시의 3D</title>
+<meta name="description" content="세종 19년(1437)에 만든 주야 겸용 천문시계 일성정시의를 세종실록 치수로 3D로 만들어 보고, 낮에는 해로, 밤에는 별로 시각을 재 보는 교육용 웹앱">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;600;700;900&display=swap" rel="stylesheet">
+<style>
+%%LEAFCSS%%
+%%ANGCSS%%
+%%SHELLCSS%%
+/* 일성정시의 추가 */
+#stage{background:#0d1622}
+#seal{top:100px}
+#sealH{font-size:28px}
+#mode{display:inline-block;margin-left:6px;padding:2px 9px;border-radius:999px;font-size:12.5px;background:var(--gold);color:#1c2326;font-weight:600}
+#mode.night{background:#3b4f86;color:#fff}
+#cap{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);z-index:3;background:rgba(20,26,28,.78);color:#fff;border-radius:10px;padding:5px 12px;font-size:13.5px;pointer-events:none;max-width:80%;text-align:center}
+.slabel{position:absolute;z-index:2;pointer-events:none;color:#ffe9a8;font:600 12.5px/1.2 var(--sans);text-shadow:0 0 4px #000,0 0 2px #000;white-space:nowrap;transform:translate(8px,-50%)}
+.slabel.dim{color:#cfd8e6;font-weight:500}
+#viewNote{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:3;background:rgba(246,247,244,.93);color:#1c2326;border-radius:10px;padding:6px 12px;font-size:13.5px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 32px)}
+#viewNote button{border:1px solid #9aa;background:#fff;border-radius:7px;padding:3px 10px;cursor:pointer}
+#stepbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0}
+#stepbar input[type=range]{flex:1;accent-color:var(--vermil)}
+.steplist{padding-left:1.3em;margin:6px 0}
+.steplist li{margin:3px 0;cursor:pointer}
+.steplist li.on{color:var(--vermil);font-weight:600}
+.steplist li.done{color:var(--muted)}
+.dimtab td:nth-child(2),.dimtab td:nth-child(3){white-space:nowrap}
+.heng{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
+.heng input[type=range]{flex:1;min-width:160px;accent-color:var(--vermil)}
+.okbadge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12.5px;font-weight:600}
+.okbadge.ok{background:color-mix(in srgb,var(--ok) 22%,transparent);color:var(--ok)}
+.okbadge.no{background:color-mix(in srgb,var(--no) 18%,transparent);color:var(--no)}
+.gakTable{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;font-size:12.5px;text-align:center}
+.gakTable div{border:1px solid var(--line);border-radius:5px;padding:3px 2px}
+.gakTable .h{background:color-mix(in srgb,var(--gold) 18%,transparent);font-weight:600}
+#ghostBtn[aria-pressed="true"],#moveBtn[aria-pressed="true"]{background:var(--jade);color:#fff;border-color:var(--jade)}
+@media (max-width:860px){#seal{top:164px!important}#quizBadge{top:164px!important}#sealH{font-size:22px}#viewNote{top:auto;bottom:150px;font-size:12.5px}#cap{display:none!important}#sealInfo{display:none}}
+</style>
+<main data-app="ilseong">
+  <div id="stage">
+    <canvas id="c3d" aria-label="일성정시의 3D 장면. 끌어서 돌리고, 휠로 확대합니다. Ctrl을 누른 채 부재를 끌면 떼어 볼 수 있습니다."></canvas>
+    <div id="labels" aria-hidden="true"></div>
+    <div id="titlebar" class="over">
+      <div><h1>일성정시의 日星定時儀<small>해와 별로 낮과 밤의 시각을 재는 세종의 천문시계(1437)</small></h1><span id="placeChip"></span></div>
+      <div class="tools">
+        <div class="topbtns"><button type="button" class="ibtn" id="shHelp" aria-label="쓰는 법 보기">?</button><button type="button" class="ibtn" id="shSet" aria-haspopup="dialog" aria-label="설정">설정</button></div>
+        <div class="seg" role="group" aria-label="보는 방향">
+          <button type="button" data-view="whole">전체</button><button type="button" data-view="south">남쪽</button><button type="button" data-view="east">동쪽</button><button type="button" data-view="face">눈금 가까이</button><button type="button" data-view="sky">하늘과 함께</button>
+        </div>
+        <div class="seg" role="group" aria-label="관측자 눈">
+          <button type="button" data-view="pole">정극환 들여다보기</button><button type="button" data-view="cord">노끈 따라 보기</button>
+        </div>
+      </div>
+    </div>
+    <div id="seal" class="over" aria-live="polite"><div id="sealH"></div><div id="sealInfo"><div id="sealK"></div><div id="sealT"></div></div></div>
+    <div id="viewNote" hidden><span id="viewNoteT"></span><button type="button" id="viewBack">돌아가기</button></div>
+    <div id="quizBadge" class="over" hidden>문제 풀이 중: 장면이 고정됩니다</div>
+    <div id="cap" hidden></div>
+    <div id="timebar" class="over">
+      <div class="tbrow" id="tbMain">
+        <button type="button" class="tb" id="bPlay" aria-pressed="false">재생</button>
+        <span id="tClock" aria-hidden="true"></span>
+        <input type="range" id="tTime" min="0" max="1439" step="1" aria-label="시계 시각(한국 표준시)">
+        <button type="button" class="tb" id="bNow">지금</button>
+        <select id="termGo" aria-label="절기로 가기"></select>
+        <button type="button" class="tb" id="tbMore" aria-expanded="false" aria-controls="tbExtra">자세히</button>
+      </div>
+      <div class="tbrow" id="tbExtra">
+        <input type="date" id="tDate" aria-label="날짜(한국 표준시)">
+        <button type="button" class="tb" id="bPrev" aria-label="하루 전">◀ 하루</button>
+        <button type="button" class="tb" id="bNext" aria-label="하루 뒤">하루 ▶</button>
+        <select id="speed" aria-label="재생 빠르기"><option value="60">1분이 1초</option><option value="600" selected>10분이 1초</option><option value="3600">1시간이 1초</option><option value="14400">4시간이 1초</option></select>
+        <button type="button" class="tb" id="bNoon">남중</button>
+        <button type="button" class="tb" id="bNight">한밤</button>
+      </div>
+    </div>
+  </div>
+
+  <aside>
+    <div role="tablist" aria-label="학습 메뉴">
+      <button role="tab" data-tab="place">내 위치</button>
+      <button role="tab" data-tab="make">만들기</button>
+      <button role="tab" data-tab="day">낮에 재기</button>
+      <button role="tab" data-tab="night">밤에 재기</button>
+      <button role="tab" data-tab="why">시계와 차이</button>
+      <button role="tab" data-tab="quiz">문제 풀기</button>
+      <button role="tab" data-tab="src">자료</button>
+    </div>
+
+    <section class="tabpanel" id="p-place">
+      <h2>먼저 우리 학교 위치를 고르세요</h2>
+      <p class="lead">일성정시의는 바퀴(시반)를 하늘의 적도와 나란하게, 축을 하늘의 북극으로 향하게 놓아야 합니다. 그래서 놓이는 곳의 위도만큼 축을 기울입니다. 같은 순간이라도 지역마다 해와 별의 위치가 다릅니다. 학교 이름(전국 초·중·고 12,004곳)이나 시·군·구 이름으로 찾거나, 지도에서 학교 자리를 누르세요.</p>
+      <div class="search"><div class="srow"><input id="psearch" type="search" placeholder="예: 부산 동구, 강릉시, ○○중학교" aria-label="시군구·학교 찾기" autocomplete="off"><button type="button" class="btn primary" id="psearchOnline">학교 이름 찾기</button></div><ul id="presults"></ul></div>
+      
+      <div class="chips">
+        <button type="button" data-preset="서울 경복궁">경복궁(만춘전 터)</button><button type="button" data-preset="부산">부산</button><button type="button" data-preset="대구">대구</button><button type="button" data-preset="광주">광주</button><button type="button" data-preset="대전">대전</button><button type="button" data-preset="강릉">강릉</button><button type="button" data-preset="제주">제주</button><button type="button" data-preset="독도">독도</button>
+      </div>
+      <div id="mapWrap">
+        <div id="mapBox" hidden></div><div id="leafBox"></div>
+        <div class="mapctl"><button type="button" id="mZin" aria-label="확대">＋</button><button type="button" id="mZout" aria-label="축소">－</button><button type="button" id="mReset">전국</button><button type="button" id="mOnline">내장 지도</button></div>
+      </div>
+      <details class="more"><summary>위도·경도로 직접 넣기 <small>기기 위치 쓰기</small></summary><div class="mbody">
+      <div class="coords">
+        <div><label for="plat">위도(°N)</label><input id="plat" inputmode="decimal"></div>
+        <div><label for="plon">경도(°E)</label><input id="plon" inputmode="decimal"></div>
+        <button type="button" class="btn primary" id="pset">적용</button>
+      </div>
+      <div class="chips"><button type="button" id="pgeo">내 기기 위치 쓰기</button></div>
+      </div></details>
+      <p id="pmsg" role="status"></p>
+      <div class="card"><h3 id="placeName"></h3><div id="placeFacts"></div>
+        
+      </div>
+      <details class="more"><summary>더 알아보기: 같은 순간, 지역마다 다른 해와 별</summary><div class="mbody">
+      <h3>같은 순간, 지역마다 다른 해와 별</h3>
+      <p class="sub"><span id="compareDate"></span> 기준.</p>
+      <div class="tablewrap" id="compare"></div>
+    </div></details>
+      </section>
+
+    <section class="tabpanel" id="p-make" hidden>
+      <h2>일성정시의 만들기</h2>
+      <p class="lead">『세종실록』 77권 세종 19년(1437) 4월 15일 기사에 실린 김돈의 「일성정시의 명(銘)과 서(序)」에는 부품마다 크기가 적혀 있습니다. 이 치수를 <b>주척(周尺) 1척 = 20.7cm</b>로 바꾸어 순서대로 조립해 봅니다.</p>
+      <div id="stepbar">
+        <button type="button" class="btn" id="sPrev">◀ 이전</button>
+        <input type="range" id="sRange" min="0" max="9" step="1" aria-label="조립 단계">
+        <button type="button" class="btn primary" id="sNext">다음 ▶</button>
+        <button type="button" class="btn" id="sPlay">처음부터 재생</button>
+      </div>
+      <div class="card" id="stepCard"></div>
+      <div class="chips">
+        <button type="button" class="btn" id="ghostBtn" aria-pressed="false">반투명</button>
+        <button type="button" class="btn" id="moveBtn" aria-pressed="false">✋ 부재 떼어 보기</button>
+        <button type="button" class="btn" id="explodeBtn">모두 펼쳐 보기</button>
+      </div>
+      <p class="sub">Ctrl(맥은 ⌘)을 누른 채, 또는 「✋ 부재 떼어 보기」를 켜고 부재를 끌면 떼어 볼 수 있습니다. 손을 놓으면 제자리로 돌아갑니다. 부재 위에 마우스를 올리면 이름이 보입니다.</p>
+      <ol class="steplist" id="stepList"></ol>
+      <h3>원문 치수와 환산</h3>
+      <div class="tablewrap" id="dimTable"></div>
+      <details class="more"><summary>더 알아보기: 어떻게 만들었을까</summary><div class="mbody">
+      <h3>어떻게 만들었을까</h3>
+      <ol class="steps">
+        <li><b>구리로 부어 만들기</b>: 실록은 「구리를 써서 만든다(用銅爲之)」고 적었습니다. 2021년 서울 인사동에서 나온 세 환 조각도 구리 합금(청동)입니다.</li>
+        <li><b>눈금 새기기</b>: 출토된 세 환에는 눈금이 은으로 상감되어 있고, 시계 방향으로 새겨져 있습니다(민병희 외 2023). 주천도분환은 1도를 4분으로, 두 백각환은 1각을 6분으로 나누었습니다.</li>
+        <li><b>수평과 남북 맞추기</b>: 대(臺)의 도랑(渠)과 못(池)에 물을 부어 수평을 잡고, 축의 겨자씨 구멍으로 정극환을 올려다보며 구진대성이 두 고리 사이를 벗어나지 않고 돌도록 맞춰 남북과 적도를 바로잡습니다.</li>
+        <li><b>주천도분환 맞추기</b>: 물시계(자격루)로 동짓날 자정을 알아낸 뒤 그때 북극 제2성(帝星)을 겨눈 자리에 주천도분환의 처음 도(初度)를 맞춥니다. 세차 때문에 수시력으로 16년 남짓에 1분, 66년 남짓에 1도씩 물러나므로 그때마다 다시 맞춥니다.</li>
+      </ol>
+    </div></details>
+      </section>
+
+    <section class="tabpanel" id="p-day" hidden>
+      <h2>낮에 해로 시각 재기</h2>
+      <div id="dayOut"></div>
+      <h3>재는 순서</h3>
+      <ol class="steps">
+        <li>계형(界衡)을 손으로 돌려, 정극환에서 계형 두 머리로 내려온 <b>두 노끈(삼각 실표)이 해와 한 면</b>에 들게 합니다. 「일구에는 두 줄을 쓴다」: 해가 바퀴 윗면을 비추는 계절(춘분~추분)에는 두 노끈의 그림자가 계형 창 속 노끈 위에 겹치고, 해가 바퀴 아랫면을 비추는 계절에는 대 위에 한 줄로 이어집니다.</li>
+        <li>해의 반대쪽, 곧 <b>붉은 세모가 있는 계형 머리</b>의 네모 창에서, 창을 가로지르는 노끈이 가리키는 <b>일구백각환(日晷百刻環)</b> 눈금을 읽습니다.</li>
+        <li>일구백각환은 돌지 않는 고리이므로, 읽은 값이 그곳의 <b>진태양시</b>(해가 정남에 오면 午正)입니다.</li>
+      </ol>
+      <div class="heng"><label><input type="checkbox" id="hengAuto" checked> 계형 자동으로 맞추기</label><input type="range" id="hengAng" min="-180" max="180" step="0.1" aria-label="계형 각도"><span id="hengFb"></span></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="oShadow" checked> 노끈 그림자 보이기</label>
+        <label><input type="checkbox" id="oSunLine"> 해에서 계형까지 빛줄기 보이기</label>
+      </div>
+      <h3>세종 때의 시각: 12시 100각</h3>
+      <p>하루를 12시(時)로 나누고, 한 시를 <b>초(初)</b>와 <b>정(正)</b>으로 나눕니다(지금의 1시간씩). 하루는 <b>100각</b>이라 1각은 지금의 <b>14분 24초</b>입니다. 백각환은 1각을 다시 <b>6분(分)</b>으로 나누어(1분 = 지금의 2분 24초) 하루가 600분입니다. 그래서 초·정(반시진)은 25분이고, 출토 유물에서는 <b>초각·1각·2각·3각(각 6분) + 4각(1분)</b>으로 새겼습니다.</p>
+      <div class="gakTable" id="gakTable"></div>
+    </section>
+
+    <section class="tabpanel" id="p-night" hidden>
+      <h2>밤에 별로 시각 재기</h2>
+      <div id="nightOut"></div>
+      <h3>왜 「북극 제2성」일까</h3>
+      <p>실록은 「북극 둘째 별은 북극에서 가깝고 가장 붉고 밝아서 여러 사람이 보기 쉬우므로 이것으로 잰다」고 적었습니다. 이 별이 북극오성(北極五星)의 <b>제(帝)</b>, 오늘날 작은곰자리 베타별(코카브)입니다. 하늘의 북극 둘레를 하루에 한 바퀴씩 돌아 1시간에 약 15°씩 움직이므로, 별의 방향으로 시각을 알 수 있습니다.</p>
+      <h3>재는 순서</h3>
+      <ol class="steps">
+        <li><b>성구백각환 맞추기</b>: 동짓날 자정(물시계로 앎)에 계형으로 제성을 겨누고, 그 읽는 머리 자리에 주천도분환의 初度를 맞춥니다. 별은 해보다 하루에 약 1도씩 일찍 돌아오므로, 그 뒤로는 날마다 성구백각환의 子正을 주천도 1도씩 시계 방향으로 옮깁니다.</li>
+        <li><b>별 겨냥</b>: 바퀴 아래에서 올려다보며 계형을 돌려 노끈 한 가닥이 제성(帝星)과 겹치게 합니다. 「성구에는 한 줄을 쓴다」(「노끈 따라 보기」).</li>
+        <li><b>읽기</b>: 붉은 세모 쪽 계형 머리 창에서 노끈이 가리키는 <b>성구백각환</b> 눈금이 밤의 시각입니다.</li>
+      </ol>
+      <div class="heng"><label><input type="checkbox" id="hengAuto2" checked> 계형 자동으로 맞추기</label><input type="range" id="hengAng2" min="-180" max="180" step="0.1" aria-label="계형 각도"><span id="hengFb2"></span></div>
+      <div class="radio" role="radiogroup" aria-label="하늘의 시대">
+        <b>별자리 하늘</b>
+        <label><input type="radio" name="epoch" value="now" checked><span>고른 날짜의 실제 하늘</span></label>
+        <label><input type="radio" name="epoch" value="1437"><span>세종 때(1437년) 하늘: 세차운동 전의 별 위치</span></label>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="oNames" checked> 중요한 별 이름 보이기</label>
+        <label><input type="checkbox" id="oAster" checked> 동양 별자리 선(북극·구진·북두) 보이기</label>
+      </div>
+      <details class="more"><summary>더 알아보기: 정극환으로 남북과 적도 바로잡기, 세차운동</summary><div class="mbody">
+      <h3>정극환으로 남북과 적도 바로잡기</h3>
+      <p>「바깥 고리와 안 고리 사이에 <b>구진대성(勾陳大星)</b>이 보이고, 안 고리 안에 <b>천추성(天樞星)</b>이 보이니, 이로써 남북과 적도를 바로잡는다.」 축 아래 구멍에서 정극환을 올려다보며(「정극환 들여다보기」) 두 별이 제자리에 보이도록 기기를 돌려 놓습니다.</p>
+      <div class="card"><h3>1437년과 지금의 두 별</h3><div id="poleStars"></div><p class="sub">지구 자전축이 약 26,000년 주기로 도는 세차운동 때문에 하늘의 북극이 별들 사이를 천천히 옮겨 갑니다. 세종 때 북극에서 3.8° 떨어져 있던 구진대성(지금의 북극성)은 지금 0.6°까지 다가와, 지금 하늘로 보면 안 고리 안으로 들어갑니다.</p></div>
+    </div></details>
+      </section>
+
+    <section class="tabpanel" id="p-why" hidden>
+      <h2>시계와 일성정시의는 왜 다를까</h2>
+      <div id="whyOut"></div>
+      <h3>까닭 1. 기준 경도가 다릅니다</h3>
+      <p>일성정시의는 그곳의 해와 별을 따르는 <b>지방시</b>를 보여 줍니다. 우리 시계는 동경 135°의 평균태양시(한국 표준시)라서, 경도 1°마다 4분씩 차이가 납니다. 서울(동경 127°)은 시계보다 해가 약 32분 늦게 남중합니다.</p>
+      <h3>까닭 2. 일구환과 성구환도 서로 조금 다릅니다</h3>
+      <p>일구백각환은 실제 해를 따르므로 <b>진태양시</b>입니다. 성구백각환은 하루 1도씩 고르게 옮겨 맞추므로 <b>고르게 흐르는 평균태양시</b>에 가깝습니다. 둘의 차이가 <b>균시차</b>이고, 1년 동안 −14분~+16분으로 바뀝니다. 지구 궤도가 타원이고 자전축이 기울어 있기 때문입니다.</p>
+      <div class="card"><h3>균시차: 일구환(해) − 성구환(별)</h3><div id="chEot"></div><p class="sub">+ 이면 해로 잰 시각이 앞서고, − 이면 뒤처집니다. 세로 점선은 고른 날짜입니다.</p></div>
+      <div class="card"><h3>보정 곡선: 午正(해가 정남)일 때 시계 시각</h3><div id="chNoon"></div></div>
+      <details class="more"><summary>더 알아보기: 까닭 3·4. 시간을 나누는 방법, 맑은 하늘</summary><div class="mbody">
+      <h3>까닭 3. 시간을 나누는 방법이 다릅니다</h3>
+      <p>세종 때는 하루를 100각으로 나누었습니다(1각 = 14.4분). 1654년(효종 5) 시헌력부터는 96각(1각 = 15분)을 썼습니다. 그래서 일성정시의 백각환의 눈금은 지금 남아 있는 조선 후기 해시계(96각)와 다릅니다.</p>
+      <h3>까닭 4. 하늘이 맑아야 합니다</h3>
+      <p>일성정시의는 해나 별이 보여야 쓸 수 있습니다. 흐리거나 비가 오는 날과, 해가 진 직후·뜨기 직전처럼 별이 아직 보이지 않을 때에는 물시계(자격루)를 써야 했습니다. 반대로 일성정시의는 자격루의 시각을 바로잡는 기준이 되었습니다.</p>
+    </div></details>
+      </section>
+
+    <section class="tabpanel" id="p-quiz" hidden>
+      <h2>일성정시의 문제</h2>
+      <p class="lead">문제마다 3D 장면이 정해진 날짜·시각과 보는 방향으로 바뀝니다. 화면을 돌리거나 확대해서 직접 읽고 답을 고르세요. 문제를 푸는 동안에는 위쪽 시각 표시가 가려집니다.</p>
+      <div id="quizBox" class="card"></div>
+    </section>
+
+    <section class="tabpanel" id="p-src" hidden>
+      <h2>자료와 만든 방법</h2>
+      <div id="srcOut"></div>
+    </section>
+  </aside>
+</main>
+<div hidden>
+  <div data-sh-slot="device" hidden>
+    <div class="radio" role="radiogroup" aria-label="일성정시의 종류"><b>기기 종류</b>
+          <label><input type="radio" name="design" value="local" checked><span><b>이곳 위도에 맞춰 놓은 일성정시의</b><br><small class="sub">용이 자루를 무는 각도를 바꾸어 축이 이곳의 하늘 북극을 가리키게 함</small></span></label>
+          <label><input type="radio" name="design" value="hanyang"><span><b>한양(북극고 38도 소약 = 37°37′)에 맞춘 일성정시의를 그대로 옮겨 둠</b><br><small class="sub">위도가 다르면 축이 북극을 벗어나 정극환 속 별과 읽은 시각이 어긋남</small></span></label>
+        </div>
+  </div>
+  <div data-sh-slot="data" hidden>
+    <details class="card" id="schoolData">
+        <summary><b>전국 학교 위치 자료</b> <span id="sdStatus" class="sub"></span></summary>
+        <p class="sub">앱에 공공데이터포털의 <a href="https://www.data.go.kr/data/15021148/standard.do" target="_blank" rel="noopener">「전국초중등학교위치표준데이터」</a>(한국교육시설안전원)가 들어 있어, 인터넷 없이도 전국 초·중·고등학교를 학교 이름으로 바로 찾습니다. 「부산 동구 중학교」처럼 지역과 학교급을 띄어 써도 찾습니다. 새 자료가 나오면 같은 파일(CSV·JSON)을 내려받아 불러와 바꿀 수 있습니다.</p>
+        <div class="chips"><label class="btn" for="sdFile">새 자료 파일로 바꾸기</label><input type="file" id="sdFile" accept=".csv,.json,text/csv,application/json" hidden><button type="button" class="btn" id="sdClear">기본 자료로 되돌리기</button></div>
+        <p class="sub">「학교 이름 찾기」를 누르면 인터넷에서도 찾습니다: 나이스 교육정보 개방 포털에서 학교 주소를 받아 OpenStreetMap으로 위치를 찾고, OpenStreetMap에서 학교 이름도 직접 찾습니다. 나이스는 인증키가 없으면 5개까지만 보여 줍니다.</p>
+        <div class="coords" style="grid-template-columns:1fr auto"><div><label for="neisKey">나이스 인증키(선택, open.neis.go.kr에서 무료 발급)</label><input id="neisKey" autocomplete="off" spellcheck="false"></div><button type="button" class="btn" id="neisSave">저장</button></div>
+      </details>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>%%SCRIPT%%</script>
+<script>
+%%SHELLJS%%
+</script>
